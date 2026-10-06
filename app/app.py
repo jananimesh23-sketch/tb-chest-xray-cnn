@@ -1,6 +1,5 @@
 import streamlit as st
 import tensorflow as tf
-from tensorflow.keras import layers, models
 from pathlib import Path
 import sys
 import time
@@ -31,47 +30,15 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Robust Model Builder & Weight Loader (Bypasses deserialization config bugs)
+# 3. Robust Model Loading using safe_mode=False to bypass legacy InputLayer config errors
 @st.cache_resource(show_spinner=False)
 def load_triage_model():
     if not MODEL_PATH.exists():
         st.error(f"System Error: Model artifact missing at {MODEL_PATH}.")
         st.stop()
     
-    # Re-instantiate the exact 4-block CNN architecture built from scratch
-    model = models.Sequential([
-        layers.Input(shape=(224, 224, 1)),
-        
-        # Block 1
-        layers.Conv2D(32, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D((2, 2)),
-        
-        # Block 2
-        layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D((2, 2)),
-        
-        # Block 3
-        layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D((2, 2)),
-        
-        # Block 4
-        layers.Conv2D(256, (3, 3), padding='same', activation='relu'),
-        layers.BatchNormalization(),
-        layers.MaxPooling2D((2, 2)),
-        
-        # Classifier Head
-        layers.Flatten(),
-        layers.Dense(256, activation='relu'),
-        layers.Dropout(0.5),
-        layers.Dense(1, activation='sigmoid')
-    ])
-    
-    # Load only the weights, bypassing architecture config serialization issues
-    model.load_weights(str(MODEL_PATH))
-    return model
+    # Load the complete model artifact, bypassing strict version safety checks on legacy layers
+    return tf.keras.models.load_model(str(MODEL_PATH), safe_mode=False)
 
 model = load_triage_model()
 
