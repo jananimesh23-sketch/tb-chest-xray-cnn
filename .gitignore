@@ -1,0 +1,13 @@
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.env
+data/
+raw_dataset/
+processed_dataset/
+*.png
+*.jpg
+*.jpeg
+checkpoints/
+*.tar.gz
+*.zip
