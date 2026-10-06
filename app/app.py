@@ -1,5 +1,6 @@
 import streamlit as st
 import tensorflow as tf
+from tensorflow.keras import layers, models
 from pathlib import Path
 import sys
 import time
@@ -11,7 +12,7 @@ sys.path.append(str(root_path))
 from configs.config import MODEL_PATH, DECISION_THRESHOLD
 from src.preprocessing import preprocess_for_inference
 
-# 1. Page Configuration (Must be the first Streamlit command)
+# 1. Page Configuration
 st.set_page_config(
     page_title="PneumoScreen | TB Triage",
     page_icon="🩺",
@@ -19,7 +20,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Custom CSS to remove generic Streamlit branding and improve typography
+# 2. Custom CSS
 st.markdown("""
     <style>
         #MainMenu {visibility: hidden;}
@@ -30,13 +31,47 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Model Loading with Caching
+# 3. Robust Model Builder & Weight Loader (Bypasses deserialization config bugs)
 @st.cache_resource(show_spinner=False)
 def load_triage_model():
     if not MODEL_PATH.exists():
         st.error(f"System Error: Model artifact missing at {MODEL_PATH}.")
         st.stop()
-    return tf.keras.models.load_model(str(MODEL_PATH))
+    
+    # Re-instantiate the exact 4-block CNN architecture built from scratch
+    model = models.Sequential([
+        layers.Input(shape=(224, 224, 1)),
+        
+        # Block 1
+        layers.Conv2D(32, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2, 2)),
+        
+        # Block 2
+        layers.Conv2D(64, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2, 2)),
+        
+        # Block 3
+        layers.Conv2D(128, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2, 2)),
+        
+        # Block 4
+        layers.Conv2D(256, (3, 3), padding='same', activation='relu'),
+        layers.BatchNormalization(),
+        layers.MaxPooling2D((2, 2)),
+        
+        # Classifier Head
+        layers.Flatten(),
+        layers.Dense(256, activation='relu'),
+        layers.Dropout(0.5),
+        layers.Dense(1, activation='sigmoid')
+    ])
+    
+    # Load only the weights, bypassing architecture config serialization issues
+    model.load_weights(str(MODEL_PATH))
+    return model
 
 model = load_triage_model()
 
@@ -55,10 +90,8 @@ uploaded_file = st.file_uploader(
 )
 
 if uploaded_file is not None:
-    # Read bytes once
     bytes_data = uploaded_file.read()
     
-    # Create a clean two-column layout
     col1, col2 = st.columns([1, 1], gap="large")
     
     with col1:
@@ -68,7 +101,6 @@ if uploaded_file is not None:
     with col2:
         st.markdown("#### Triage Assessment")
         
-        # Simulated processing delay for UX (prevents jarring instantaneous flashes)
         with st.spinner("Executing forward pass..."):
             start_time = time.time()
             try:
@@ -80,13 +112,11 @@ if uploaded_file is not None:
                 st.stop()
             inference_time = time.time() - start_time
 
-        # Primary Abstraction: Clear, binary clinical outcome
         if is_tb:
             st.error("🚨 **Presumptive Finding: Tuberculosis**\n\nHigh probability of spatial features correlating with TB pathology.")
         else:
             st.success("✅ **Presumptive Finding: Normal**\n\nNo significant spatial features correlating with TB pathology detected.")
             
-        # Progressive Disclosure: Technical details hidden by default
         with st.expander("🔬 Technical & Clinical Metrics", expanded=False):
             st.markdown(f"**Calculated Probability:** `{raw_prediction:.4f}`")
             st.markdown(f"**Decision Threshold:** `τ = {DECISION_THRESHOLD}`")
