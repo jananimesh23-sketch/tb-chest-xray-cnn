@@ -17,22 +17,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- BACKGROUND STYLING CODE START ---
-st.markdown("""
-    <style>
-    .stApp {
-        background-image: linear-gradient(rgba(255, 255, 255, 0.9), rgba(255, 255, 255, 0.9)), 
-                          url("https://images.unsplash.com/photo-1584036561566-baf8f5f1b144?auto=format&fit=crop&w=1920&q=80");
-        background-size: cover;
-        background-position: center;
-    }
-    #MainMenu {visibility: hidden;}
-    footer {visibility: hidden;}
-    header {visibility: hidden;}
-    .block-container {padding-top: 2rem; padding-bottom: 2rem;}
-    </style>
-""", unsafe_allow_html=True)
-# --- BACKGROUND STYLING CODE END ---
+
 
 @st.cache_resource(show_spinner=False)
 def load_triage_model():
