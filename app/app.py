@@ -1,5 +1,6 @@
 import streamlit as st
 import tensorflow as tf
+from tensorflow.keras.layers import InputLayer
 from pathlib import Path
 import sys
 import time
@@ -30,15 +31,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# 3. Robust Model Loading using safe_mode=False to bypass legacy InputLayer config errors
+# 3. Bulletproof Model Loader with InputLayer Patch
 @st.cache_resource(show_spinner=False)
 def load_triage_model():
     if not MODEL_PATH.exists():
         st.error(f"System Error: Model artifact missing at {MODEL_PATH}.")
         st.stop()
     
-    # Load the complete model artifact, bypassing strict version safety checks on legacy layers
-    return tf.keras.models.load_model(str(MODEL_PATH), safe_mode=False)
+    # Define a custom InputLayer that strips legacy config arguments causing version crashes
+    class PatchedInputLayer(InputLayer):
+        @classmethod
+        def from_config(cls, config):
+            config.pop('batch_shape', None)
+            config.pop('optional', None)
+            return super().from_config(config)
+
+    # Load model passing our custom object to override default deserialization schema validation
+    return tf.keras.models.load_model(
+        str(MODEL_PATH), 
+        custom_objects={'InputLayer': PatchedInputLayer},
+        safe_mode=False
+    )
 
 model = load_triage_model()
 
